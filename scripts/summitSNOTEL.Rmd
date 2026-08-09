@@ -1,0 +1,52 @@
+---
+title: "summitSNOTEL"
+author: "Gordon Gianniny"
+date: "2026-08-09"
+output: html_document
+---
+
+```{r setup, include=F, echo = F}
+library(tidyverse)
+library(broom)
+library(ggplot2)
+library(lubridate)
+library(RColorBrewer)
+library(here)
+library(patchwork)
+library(snotelr)
+library(zoo)
+library(dataRetrieval)
+library(cpop)
+```
+
+# Overview
+
+This script reads in data from SNOTEL stations in Summit County, UT, reformats the data, and draws plots showing: 
+
+  A. Change in snowpack over time
+  
+  B. Ratio of snow to total precip over time
+  
+Sections: 
+
+  1. Read in SNOTEL Data
+  2. Data re-formatting & cleanup
+  3. Snowpack change over time plots
+  4. Snow:total precip ratio
+    + Calculate snow:total precip ratio
+    + Draw plots
+    
+All plots are stored in the "outputs>plots" folder within the project directory. 
+
+##1. Read in SNOTEL Data
+
+##2. Data re-formatting & cleanup
+
+##3. Snowpack change over time plots
+
+##4. Snow:total precip ratio
+
+### A. Calculate snow:total precip ratio
+
+### B. Draw plots
+
