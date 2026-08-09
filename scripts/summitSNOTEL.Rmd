@@ -40,9 +40,45 @@ All plots are stored in the "outputs>plots" folder within the project directory.
 
 ##1. Read in SNOTEL Data
 
+Import data from Snotel using the snotelr package:
+
+Get metadata for sites in Summit County:
+
+```{r}
+snotelMd <- snotel_info(network="sntl")%>%
+  filter(county == "Summit"&state == "UT") #Info for sites in Summit county UT
+
+siteIds <- c(snotelMd$site_id)
+```
+
+Data for all sites in Summit County:
+
+```{r}
+snotelData <- snotel_download(site_id = siteIds, network = "sntl", internal = T)%>%
+  mutate(date = ymd(date), site_name = as.factor(site_name))
+```
+
 ##2. Data re-formatting & cleanup
 
+Dropping extra columns:
+
+```{r}
+snotelClean <- snotelData %>%
+  select(!c(network, state, description, latitude, longitude, county, site_id))
+```
+
 ##3. Snowpack change over time plots
+
+###A. Calculate relevant snowpack variables for each year: 
+
+```{r}
+snotelStats <- snotelClean%>%
+  mutate(year = year(date), doy = yday(date), month = month(date))%>%
+  mutate(waterYear = ifelse(month<10, year, year+1))%>%
+  group_by(site_name, waterYear)%>%
+  summarize(sweMax = max(snow_water_equivalent, na.rm = T), 
+            sweMax_doy = doy[which.max(snow_water_equivalent)])
+```
 
 ##4. Snow:total precip ratio
 
