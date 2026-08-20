@@ -96,7 +96,7 @@ snotelStats <- snotelClean%>%
   pivot_longer(!c(site_name, elev, year, siteElev), names_to = "metricName", values_to = "metricValue") #pivot longer for plotting
 ```
 
-###B. Nest data and run basic LM's
+###B. Site-by-site - Nest data and run basic LM's
 
 ```{r}
 snotelNest <- snotelStats %>%
@@ -133,7 +133,7 @@ sPVs <- swePV%>%
   summarize(x = mean(year), label = round(unique(p.value), 2))
 ```
 
-###C. Draw and export plots
+###C. Draw and export site-by-site plots
 
 Prepping color pallate:
 
@@ -210,6 +210,108 @@ melt.plot
 
 #Save plot:
 ggsave("melt_days.jpg", melt.plot, device = "jpeg", path = here("outputs", "plots"), units = "in", dpi = "retina", height = 8, width = 11)
+```
+
+### D. Overall/combined plot: 
+
+```{r}
+combNest <- snotelStats %>%
+  nest(data = -c(metricName)) #create new nested dataframe with columns for site and metricName, one column for data - data entries for each site include year and metricValues. 
+```
+
+Run basic models for each site and metric of interest: 
+
+```{r}
+combModels <- combNest %>%
+  mutate(model = map(data, ~lm(metricValue~year, data = .)%>% #run a model of temp~year for each site (referenced by "."); store results in new column called "model"
+                     tidy))%>% #tidy function to construct a summary table with model results (seperate tables for each site)
+  unnest(model) %>% #unnest model column to get rows for each site, columns for model metrics
+  filter(term == "year")  #remove intercept term to just get info on year for each site
+combModels
+```
+
+Add P-values for plotting: 
+
+```{r}
+combPV <- merge(snotelStats, 
+                     select(combModels, metricName, p.value)
+                     )%>%
+  mutate(metricPrint = case_when(
+    metricName == "sweMax" ~ "Maximum Recorded SWE, mm", 
+    metricName == "sweMaxDOY" ~"Day of year of max. recorded SWE", 
+    metricName == "sweZero" ~"First day of year w/ zero recorded SWE",
+    metricName == "meltDays" ~"Melt duration, days"
+  ))
+
+cPVs <- combPV%>%
+  group_by(metricName)%>%
+  summarize(x = mean(year), label = round(unique(p.value), 6))
+```
+
+#### i. Max SWE Plot:
+
+```{r}
+swe.max.comb <- ggplot(filter(snotelStats, metricName == "sweMax"), aes(x = year, y = metricValue, color = elev))+
+  geom_point()+
+  geom_smooth(se = T, method = "lm", linetype = "dashed", color = "black")+
+  theme_classic()+
+  labs(x = "Water Year", y = "Maximum recorded SWE, mm", color = "Site elevation, m")+
+  scale_color_continuous(palette = elevPal)+
+  geom_text(data = filter(cPVs, metricName == "sweMax"), aes(x = x, label = paste("P=", label)), y = Inf, vjust = 2, color = "black")+
+  theme(axis.text = element_text(size = 11), 
+        axis.title = element_text(size = 11, face = "bold"), 
+        strip.text = element_text(size = 10, face = "bold"), 
+        legend.position = "bottom")
+
+
+swe.max.comb
+
+#Save plot:
+ggsave("SWE_max_comb.jpg", swe.max.comb, device = "jpeg", path = here("outputs", "plots"), units = "in", dpi = "retina", height = 8, width = 11)
+```
+
+#### ii. Max SWE DOY plot
+
+```{r}
+swe.maxDOY.comb <- ggplot(filter(snotelStats, metricName == "sweMax_doy"), aes(x = year, y = metricValue, color = elev))+
+  geom_point()+
+  geom_smooth(se = T, method = "lm", linetype = "dashed", color = "black")+
+  theme_classic()+
+  labs(x = "Water Year", y = "Day of year of maximum recorded SWE", color = "Site elevation, m")+
+  scale_color_continuous(palette = elevPal)+
+  geom_text(data = filter(cPVs, metricName == "sweMax_doy"), aes(x = x, label = paste("P=", label)), y = Inf, vjust = 2, color = "black")+
+  theme(axis.text = element_text(size = 11), 
+        axis.title = element_text(size = 11, face = "bold"), 
+        strip.text = element_text(size = 10, face = "bold"), 
+        legend.position = "bottom")
+
+
+swe.maxDOY.comb
+
+#Save plot:
+ggsave("SWE_maxDOY_comb.jpg", swe.maxDOY.comb, device = "jpeg", path = here("outputs", "plots"), units = "in", dpi = "retina", height = 8, width = 11)
+```
+
+#### iii. Melt duration plot
+
+```{r}
+melt.comb <- ggplot(filter(snotelStats, metricName == "meltDays"), aes(x = year, y = metricValue, color = elev))+
+  geom_point()+
+  geom_smooth(se = T, method = "lm", linetype = "dashed", color = "black")+
+  theme_classic()+
+  labs(x = "Water Year", y = "# days between peak SWE and 1st day with 0 recorded SWE", color = "Site elevation, m")+
+  scale_color_continuous(palette = elevPal)+
+  geom_text(data = filter(cPVs, metricName == "meltDays"), aes(x = x, label = paste("P=", label)), y = Inf, vjust = 2, color = "black")+
+  theme(axis.text = element_text(size = 11), 
+        axis.title = element_text(size = 11, face = "bold"), 
+        strip.text = element_text(size = 10, face = "bold"), 
+        legend.position = "bottom")
+
+
+melt.comb
+
+#Save plot:
+ggsave("melt_comb.jpg", melt.comb, device = "jpeg", path = here("outputs", "plots"), units = "in", dpi = "retina", height = 8, width = 11)
 ```
 
 ##4. Snow:total precip ratio
