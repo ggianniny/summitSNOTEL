@@ -76,7 +76,10 @@ snotelClean <- snotelData %>%
                            doy-(doyMax-92), 
                            doy+92)
          )%>% # #use min/max DOY to calculate water day of year
-  mutate(siteElev = paste("(", elev, " m", ")", " - ", site_name, sep =""))
+  mutate(siteElev = paste("(", elev, " m", ")", " - ", site_name, sep =""))%>%
+  mutate(snow_water_equivalent = snow_water_equivalent/25.4, 
+         precipitation = precipitation/25.4, 
+         precipitation_cumulative=precipitation_cumulative/25.4) #converting swe and precip to in instead of mm
 
 ```
 
@@ -251,16 +254,15 @@ cPVs <- combPV%>%
 #### i. Max SWE Plot:
 
 ```{r}
-swe.max.comb <- ggplot(filter(snotelStats, metricName == "sweMax"), aes(x = year, y = metricValue, color = elev))+
-  geom_point()+
+swe.max.comb <- ggplot(filter(snotelStats, metricName == "sweMax"&metricValue<=40), aes(x = year, y = metricValue))+
+  geom_point(color = "#6a89a7", size = 4)+
   geom_smooth(se = T, method = "lm", linetype = "dashed", color = "black")+
   theme_classic()+
-  labs(x = "Water Year", y = "Maximum recorded SWE, mm", color = "Site elevation, m")+
-  scale_color_continuous(palette = elevPal)+
-  geom_text(data = filter(cPVs, metricName == "sweMax"), aes(x = x, label = paste("P=", label)), y = Inf, vjust = 2, color = "black")+
-  theme(axis.text = element_text(size = 11), 
-        axis.title = element_text(size = 11, face = "bold"), 
-        strip.text = element_text(size = 10, face = "bold"), 
+  labs(x = "Water Year", y = "Maximum recorded SWE, in")+
+  geom_text(data = filter(cPVs, metricName == "sweMax"), aes(x = x, label = paste("P=", label)), y = Inf, vjust = 2, color = "black", size = 7)+
+  theme(axis.text = element_text(size = 20), 
+        axis.title = element_text(size = 20, face = "bold"), 
+        strip.text = element_text(size = 18, face = "bold"), 
         legend.position = "bottom")
 
 
@@ -343,11 +345,11 @@ snowStats <- rainSnow %>%
   filter(!is.nan(snowRatio)) #drop years w missing data
 ```
 
-Separate calculation for December-Feb precip:
+Separate calculation for December-Mar precip:
 
 ```{r}
 winterSnow <- rainSnow %>%
-  filter(month == 12|month == 1|month==2)%>%
+  filter(month == 12|month == 1|month==2|month==3)%>%
   group_by(site_name, elev, waterYear, siteElev)%>% #Group by site, water year, and elevation
   summarize(totPrecip = sum(precipitation), 
             totSnow = sum(dailySnow), 
@@ -411,7 +413,7 @@ annual.snow
 ggsave("waterYear_snowProp.jpg", annual.snow, device = "jpeg", path = here("outputs", "plots"), units = "in", dpi = "retina", height = 8, width = 11)
 ```
 
-#### ii. December-February snow proportion
+#### ii. December-March snow proportion
 
 ```{r}
 winterNest <- winterSnow %>%
@@ -462,3 +464,80 @@ winter.snow
 #Save plot:
 ggsave("winter_snowProp.jpg", winter.snow, device = "jpeg", path = here("outputs", "plots"), units = "in", dpi = "retina", height = 8, width = 11)
 ```
+
+### C. Combined plots
+
+#### i. Entire year:
+
+Run basic LM:
+
+```{r}
+annualSnow.Mod <- lm(snowRatio~waterYear, data = snowStats)# run model
+summary(annualSnow.Mod)$coefficients[8] #check summary
+asm.pv <- round(summary(annualSnow.Mod)$coefficients[8], 2) #extract p value for waterYear
+```
+
+Draw annual plot: 
+
+```{r}
+annual.snow.comb <- ggplot(snowStats, aes(x = waterYear, y = snowRatio, color = elev))+
+  geom_point()+
+  geom_smooth(se = T, method = "lm", linetype = "dashed", color ="black")+
+  theme_classic()+
+  labs(x = "Water Year", y = "Snow:total water year precip ratio", color = "Site elevation, m")+
+  scale_color_continuous(palette = elevPal)+
+  annotate("text", x = mean(snowStats$waterYear), y = 1, label=paste("P=", asm.pv, sep = ""))+
+  theme(axis.text = element_text(size = 11), 
+        axis.title = element_text(size = 11, face = "bold"), 
+        strip.text = element_text(size = 10, face = "bold"), 
+        legend.position = "bottom")
+
+
+annual.snow.comb
+
+#Save plot:
+ggsave("waterYear_snowProp_comb.jpg", annual.snow.comb, device = "jpeg", path = here("outputs", "plots"), units = "in", dpi = "retina", height = 8, width = 11)
+```
+
+#### i. Winter only:
+
+Run basic LM:
+
+```{r}
+winterSnow.Mod <- lm(snowRatio~waterYear, data = winterSnow)# run model
+summary(winterSnow.Mod) #check summary
+wsm.pv <- round(summary(winterSnow.Mod)$coefficients[8], 6) #extract p value for waterYear
+wsm.pv
+```
+
+Draw winter plot: 
+
+```{r}
+winter.snow.comb <- ggplot(winterSnow, aes(x = waterYear, y = snowRatio))+
+  geom_point(color = "#6a89a7", size = 4)+
+  geom_smooth(se = T, method = "lm", linetype = "dashed", color ="black")+
+  theme_classic()+
+  labs(x = "Water Year", y = "Dec - Mar Snow:total precip ratio")+
+  scale_color_continuous(palette = elevPal)+
+  annotate("text", x = mean(winterSnow$waterYear), y = 0.7, label=paste("P=", wsm.pv, sep = ""), size = 7)+
+  theme(axis.text = element_text(size = 20), 
+        axis.title = element_text(size = 20, face = "bold"), 
+        strip.text = element_text(size = 18, face = "bold"), 
+        legend.position = "bottom")
+
+
+winter.snow.comb
+
+#Save plot:
+ggsave("winter_snowProp_comb.jpg", winter.snow.comb, device = "jpeg", path = here("outputs", "plots"), units = "in", dpi = "retina", height = 8, width = 11)
+```
+
+Combined Swe Max and winter snow proportion plot: 
+
+```{r}
+comb.plot <- swe.max.comb/winter.snow.comb
+comb.plot
+
+ggsave("sweMax_snowProp_comb.pdf", comb.plot, device = "pdf", path = here("outputs", "plots"), units = "in", dpi = "retina", height = 10.5, width = 8)
+```
+
